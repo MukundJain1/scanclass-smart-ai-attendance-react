@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { registerStudent } from '../../services/api';
+import { Loader2, Mic } from 'lucide-react';
 
 interface RegistrationFormProps {
   faceImage: string;
@@ -12,7 +13,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ faceImage, onSucces
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -22,17 +22,11 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ faceImage, onSucces
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
+      mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(audioBlob);
+        setAudioBlob(new Blob(audioChunksRef.current, { type: 'audio/webm' }));
         stream.getTracks().forEach(track => track.stop());
       };
-
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
@@ -49,20 +43,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ faceImage, onSucces
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return alert("Please enter your name");
-
+    if (!name.trim()) return;
     setIsSubmitting(true);
     try {
-      // Pass the object directly matching your api.ts definition.
-      // The registerStudent function will handle creating the FormData.
-      const response = await registerStudent({
-        name: name,
-        faceImage: faceImage,
-        audioBlob: audioBlob
-      });
-
-      // Pass the returned data to your success handler 
-      // (Adjust response.student to match exactly what your backend returns)
+      const response = await registerStudent({ name, faceImage, audioBlob });
       onSuccess(response.student || response);
     } catch (error) {
       console.error("Registration failed", error);
@@ -72,51 +56,52 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ faceImage, onSucces
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] animate-fade-in px-4">
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl font-bold mb-6 text-center">Register New Profile</h2>
+    <div className="flex-1 flex flex-col items-center justify-center animate-fade-in w-full max-w-md mx-auto">
+      <div className="bg-[#FFFFFF] dark:bg-[#12161F] p-6 sm:p-8 rounded-[16px] shadow-sm w-full border border-[#E2E5EB] dark:border-[#232937]">
+        <h2 className="text-[24px] font-display font-bold mb-6 text-center">Register Profile</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Full Name</label>
+            <label className="block text-[13px] uppercase tracking-[0.05em] font-semibold text-[#5B6472] dark:text-[#9AA3B2] mb-2">Full Name</label>
             <input 
               type="text" 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Mukund Jain"
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-blue-500 outline-none transition"
+              className="w-full min-h-[44px] px-4 rounded-lg bg-[#F7F8FA] dark:bg-[#0B0E14] border border-[#E2E5EB] dark:border-[#232937] focus:outline-none focus:ring-2 focus:ring-[#4F7CFF] focus:border-transparent transition-all"
               required
             />
           </div>
 
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              🎙️ Voice Enrollment <span className="text-xs bg-blue-200 dark:bg-blue-800 px-2 py-1 rounded-full">Optional</span>
+          <div className="p-4 bg-[#EEF0F4] dark:bg-[#1B2130] rounded-lg border border-[#E2E5EB] dark:border-[#232937]">
+            <h3 className="font-semibold mb-2 flex items-center justify-between text-[15px]">
+              <span className="flex items-center gap-2"><Mic size={16}/> Voice Enrollment</span>
+              <span className="text-[12px] uppercase tracking-wide bg-[#E2E5EB] dark:bg-[#232937] px-2 py-0.5 rounded text-[#5B6472] dark:text-[#9AA3B2]">Optional</span>
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-[13px] text-[#5B6472] dark:text-[#9AA3B2] mb-4">
               Record a short phrase like: "I'm present, my name is {name || '...'}"
             </p>
             
             <div className="flex items-center gap-4">
               {!isRecording ? (
-                <button type="button" onClick={startRecording} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors">
+                <button type="button" onClick={startRecording} className="min-h-[44px] px-4 text-[14px] bg-[#FFFFFF] dark:bg-[#12161F] border border-[#E2E5EB] dark:border-[#232937] hover:border-[#4F7CFF] rounded-lg transition-colors font-medium">
                   Start Recording
                 </button>
               ) : (
-                <button type="button" onClick={stopRecording} className="px-4 py-2 bg-gray-800 animate-pulse text-white rounded-lg transition-colors">
+                <button type="button" onClick={stopRecording} className="min-h-[44px] px-4 text-[14px] bg-[#EF4444] text-white rounded-lg animate-pulse font-medium">
                   Stop Recording
                 </button>
               )}
-              {audioBlob && !isRecording && <span className="text-green-500 text-sm font-medium">✓ Audio captured</span>}
+              {audioBlob && !isRecording && <span className="text-[#22C55E] text-[13px] font-semibold">✓ Saved</span>}
             </div>
           </div>
 
-          <div className="flex gap-4 mt-8">
-            <button type="button" onClick={onCancel} className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onCancel} className="flex-1 min-h-[44px] border border-[#E2E5EB] dark:border-[#232937] bg-[#FFFFFF] dark:bg-[#12161F] hover:bg-[#F7F8FA] dark:hover:bg-[#1B2130] rounded-[8px] font-medium transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting || !name} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition">
-              {isSubmitting ? 'Creating Profile...' : 'Create Account'}
+            <button type="submit" disabled={isSubmitting || !name} className="flex-1 min-h-[44px] bg-[#4F7CFF] hover:bg-[#3f65d6] text-white rounded-[8px] font-semibold disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+              {isSubmitting ? <><Loader2 size={16} className="animate-spin"/> Saving...</> : 'Create Account'}
             </button>
           </div>
         </form>
@@ -124,5 +109,4 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ faceImage, onSucces
     </div>
   );
 };
-
 export default RegistrationForm;
