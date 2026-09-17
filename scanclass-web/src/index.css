@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-app: #f8fafc;
+    --bg-surface: #ffffff;
+    --border-color: #e2e8f0;
+    --brand-primary: #4f46e5;
+    --brand-hover: #4338ca;
+    --text-primary: #0f172a;
+    --text-muted: #64748b;
+  }
+
+  .dark {
+    --bg-app: #0b0f17;
+    --bg-surface: #131b26;
+    --border-color: #1e293b;
+    --brand-primary: #6366f1;
+    --brand-hover: #4f46e5;
+    --text-primary: #f8fafc;
+    --text-muted: #94a3b8;
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
