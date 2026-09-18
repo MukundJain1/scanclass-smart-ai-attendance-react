@@ -7,12 +7,13 @@ from src.database.config import supabase
 
 app = FastAPI(title="ScanClass AI Backend")
 
+# --- THE BULLETPROOF CORS CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://scanclass-ai.vercel.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],      # God Mode: Accepts requests from ANY URL
+    allow_credentials=False,  # Must be False when origins is "*". You don't use cookies, so this is perfectly fine!
+    allow_methods=["*"],      # Allows all HTTP methods (OPTIONS, GET, POST, etc.)
+    allow_headers=["*"],      # Allows all headers
 )
 
 @app.get("/api/health")
