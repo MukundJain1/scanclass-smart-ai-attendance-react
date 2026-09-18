@@ -1,75 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import CameraCapture from './CameraCaptured';
-import RegistrationForm from './RegistrationForm';  
+import { api } from '../../services/api'; 
+import { ArrowLeft, Loader2, ScanLine } from 'lucide-react';
 import StudentDashboard from './StudentDashboard';
-import { ThemeToggle } from '../../components/common/ThemeToggle';
-import { analyzeFace } from '../../services/api'; 
-import { LogOut, CheckCircle, XCircle, Sparkles } from 'lucide-react';
-
-export type Step = 'camera' | 'register' | 'dashboard';
+import RegistrationForm from './RegistrationForm';
+import { DialogBox, type DialogProps } from '../../components/Dialogbox';
 
 export interface StudentData { student_id: string; name: string; subjects?: any[]; }
 
 const StudentPortal: React.FC = () => {
-  const [currentStep, setCurrentStep] = useState<Step>('camera');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [studentData, setStudentData] = useState<StudentData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [unregisteredFace, setUnregisteredFace] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [streamActive, setStreamActive] = useState(false);
   const navigate = useNavigate();
+  
+  const [dialog, setDialog] = useState<DialogProps>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  const showToast = (message: string, type: 'success' | 'error') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000); };
-
-  const handleFaceCapture = async (imageSrc: string) => {
-    setCapturedImage(imageSrc); setIsLoading(true);
-    try {
-      const response = await analyzeFace(imageSrc); 
-      if (response.exists && response.student) {
-        setStudentData(response.student); setCurrentStep('dashboard'); showToast(`Welcome back, ${response.student.name}`, 'success');
-      } else { setCurrentStep('register'); }
-    } catch (error) { showToast("Could not verify face. Please try again.", "error"); } finally { setIsLoading(false); }
+  const showDialog = (title: string, message: string, type: DialogProps['type'] = 'alert') => {
+    setDialog({ isOpen: true, title, message, type, onConfirm: () => setDialog(prev => ({ ...prev, isOpen: false })) });
   };
 
+  useEffect(() => {
+    let currentStream: MediaStream | null = null;
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        currentStream = stream;
+        if (videoRef.current) { videoRef.current.srcObject = stream; setStreamActive(true); }
+      } catch (err) { showDialog("Camera Error", "Please allow camera access to scan your face.", "error"); }
+    };
+    if (!studentData && !unregisteredFace) startCamera();
+    return () => { if (currentStream) currentStream.getTracks().forEach(track => track.stop()); };
+  }, [studentData, unregisteredFace]);
+
+  const handleFaceScan = async () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const imageSrc = canvas.toDataURL('image/jpeg', 0.9);
+        
+        setIsLoading(true);
+        try {
+          const response = await api.post('/attendance/student/verify-face', { image: imageSrc });
+          if (response.data.match_found && response.data.student_data) {
+            setStudentData(response.data.student_data);
+          } else {
+            setUnregisteredFace(imageSrc); 
+            showDialog("Not Recognized", "Face not found. Please complete your profile registration.", "alert");
+          }
+        } catch (error) { showDialog("Authentication Failed", "Could not reach the server. Please try again.", "error"); } 
+        finally { setIsLoading(false); }
+      }
+    }
+  };
+
+  if (studentData) return <StudentDashboard studentData={studentData} showToast={(msg, type) => showDialog(type === 'success' ? 'Success' : 'Error', msg, type)} />;
+  if (unregisteredFace) return <RegistrationForm faceImage={unregisteredFace} onSuccess={(data) => { setStudentData(data); }} onCancel={() => setUnregisteredFace(null)} />;
+
   return (
-    <div className="min-h-screen bg-[#FDF9F1] dark:bg-[#120D0A] text-[#2B1B12] dark:text-[#E8DCD0] font-sans flex flex-col relative transition-colors duration-700">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 relative">
+      <DialogBox {...dialog} />
       
-      <header className="w-full px-6 lg:px-12 py-5 border-b border-[#E8DCD0] dark:border-[#3A2A22] bg-white/50 dark:bg-[#1E1612]/50 backdrop-blur-xl flex justify-between items-center sticky top-0 z-40">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#D2691E] to-[#8B4513] flex items-center justify-center text-white shadow-lg">
-            <Sparkles size={20} />
+      <button onClick={() => navigate('/')} className="absolute top-8 left-8 text-slate-500 hover:text-cyan-400 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] transition-colors border border-transparent hover:border-cyan-400/30 bg-white/5 px-4 py-2 rounded-lg backdrop-blur-md">
+        <ArrowLeft size={14} /> Exit
+      </button>
+
+      <div className="w-full max-w-md rounded-[2.5rem] p-1 bg-gradient-to-b from-cyan-500/30 to-transparent shadow-[0_0_80px_rgba(34,211,238,0.15)] animate-fade-in-up">
+        <div className="bg-[#0A0F1C]/90 backdrop-blur-2xl border border-white/5 rounded-[2.4rem] p-8 relative overflow-hidden">
+          
+          <div className="absolute -top-20 -left-20 w-48 h-48 bg-cyan-500/20 blur-[50px] rounded-full pointer-events-none"></div>
+
+          <div className="flex items-center justify-center gap-3 text-sm font-black text-white mb-2 uppercase tracking-widest">
+            <ScanLine className="text-cyan-400" size={20} /> Face Scanner
           </div>
-          <h1 className="text-xl font-display font-extrabold tracking-wider leading-tight">SHISHYA PORTAL</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <ThemeToggle />
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold border border-[#E8DCD0] dark:border-[#3A2A22] hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 hover:border-red-200 dark:hover:border-red-800 transition-all hover:scale-105">
-            <LogOut size={18} /> Exit
+          <p className="text-center text-slate-400 text-[10px] font-bold mb-8 uppercase tracking-[0.2em]">Position your face to verify your identity</p>
+
+          <div className="relative w-full aspect-square bg-[#030509] rounded-[2rem] overflow-hidden border border-white/10 mb-8 shadow-inner group">
+            <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-opacity duration-1000 ${streamActive ? 'opacity-100' : 'opacity-0'}`} />
+            
+            <div className="absolute inset-4 border-2 border-dashed border-cyan-400/20 rounded-full animate-[spin_10s_linear_infinite] pointer-events-none"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-64 border border-cyan-400/40 rounded-[3rem] pointer-events-none"></div>
+            
+            <div className="absolute top-1/2 left-0 w-full h-[1px] bg-cyan-400/20 pointer-events-none"></div>
+            <div className="absolute left-1/2 top-0 w-[1px] h-full bg-cyan-400/20 pointer-events-none"></div>
+
+            {streamActive && !isLoading && <div className="absolute left-0 w-full h-1 bg-cyan-400 shadow-[0_0_20px_#22d3ee] animate-scan pointer-events-none opacity-50" style={{ animation: 'scanLine 2s ease-in-out infinite' }}><style>{`@keyframes scanLine { 0% { top: 5%; } 50% { top: 95%; } 100% { top: 5%; } }`}</style></div>}
+            
+            {isLoading && (
+              <div className="absolute inset-0 bg-[#030509]/80 backdrop-blur-md flex flex-col items-center justify-center text-cyan-400 z-20">
+                <Loader2 className="animate-spin mb-4" size={40} />
+                <span className="text-[10px] font-black tracking-[0.3em] uppercase">Verifying Identity...</span>
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleFaceScan} disabled={isLoading || !streamActive} className="w-full h-16 bg-cyan-400 hover:bg-cyan-300 text-black font-black rounded-xl transition-all shadow-[0_0_30px_rgba(34,211,238,0.4)] disabled:opacity-50 text-xs uppercase tracking-[0.2em] flex items-center justify-center hover:scale-[1.02] active:scale-95">
+            Scan Face
           </button>
         </div>
-      </header>
-
-      {toast && (
-        <div className={`fixed top-24 right-8 z-50 px-5 py-4 rounded-xl shadow-2xl border flex items-center gap-3 animate-fade-in-up backdrop-blur-md ${toast.type === 'success' ? 'bg-[#22C55E]/10 border-[#22C55E]/30 text-[#22C55E]' : 'bg-[#EF4444]/10 border-[#EF4444]/30 text-[#EF4444]'}`}>
-          {toast.type === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
-          <span className="text-[15px] font-bold tracking-wide">{toast.message}</span>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#FDF9F1]/80 dark:bg-[#120D0A]/80 backdrop-blur-lg">
-          <div className="w-16 h-16 border-4 border-[#B85C38]/20 border-t-[#B85C38] rounded-full animate-spin mb-6"></div>
-          <span className="text-lg font-bold text-[#8A5A44] tracking-widest uppercase">Seeking Identity...</span>
-        </div>
-      )}
-
-      <main className="flex-1 w-full max-w-[1600px] mx-auto p-6 lg:p-12 flex flex-col">
-        {currentStep === 'camera' && <CameraCapture onCapture={handleFaceCapture} />}
-        {currentStep === 'register' && capturedImage && (
-          <RegistrationForm faceImage={capturedImage} onSuccess={(data) => { setStudentData(data); setCurrentStep('dashboard'); showToast("Profile created successfully!", "success"); }} onCancel={() => setCurrentStep('camera')} />
-        )}
-        {currentStep === 'dashboard' && studentData && <StudentDashboard studentData={studentData} showToast={showToast} />}
-      </main>
+      </div>
     </div>
   );
 };

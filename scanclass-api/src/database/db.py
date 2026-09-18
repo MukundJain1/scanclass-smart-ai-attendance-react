@@ -173,3 +173,35 @@ def get_student_by_id(student_id: int) -> dict[str, Any] | None:
         .execute()
     )
     return to_dict(response.data)
+
+
+def check_if_code_exists_in_db(subject_code: str) -> bool:
+    """
+    Checks if a subject code already exists in the database.
+    Used to prevent teachers from creating duplicate join codes.
+    """
+    response = (
+        supabase.table("subjects")
+        .select("subject_code")
+        .eq("subject_code", subject_code.strip())
+        .execute()
+    )
+    return len(to_dict_list(response.data)) > 0
+
+
+def delete_subject_from_db(teacher_id: str, subject_id: str) -> bool:
+    """
+    Deletes a subject from the database. 
+    It checks the teacher_id to ensure a teacher can only delete their own subjects.
+    
+    Note: Ensure your Supabase foreign keys (for subject_students and attendance_logs) 
+    are set to 'ON DELETE CASCADE' so related data is cleaned up automatically.
+    """
+    response = (
+        supabase.table("subjects")
+        .delete()
+        .eq("subject_id", subject_id)
+        .eq("teacher_id", teacher_id)
+        .execute()
+    )
+    return len(to_dict_list(response.data)) > 0
