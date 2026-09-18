@@ -23,3 +23,8 @@ pillow
 setuptools>=77.0.3,<81
 
 python-dotenv
+
+resemblyzer
+torch
+scipy
+webrtcvad
