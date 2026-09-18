@@ -1,13 +1,11 @@
 from resemblyzer import VoiceEncoder, preprocess_wav
 import numpy as np
 import io
-import librosa 
-import streamlit as st
+import librosa
+import logging # Added built-in logging for backend server logs
 
-@st.cache_resource
 def load_voice_encoder():
     return VoiceEncoder()
-
 
 def get_voice_embedding(audio_bytes):
     try:
@@ -20,7 +18,8 @@ def get_voice_embedding(audio_bytes):
         return list(embeddings)
 
     except Exception as e:
-        st.error(f"A voice recognition error {e}")
+        # Replaced st.error with logging so it prints to the Render console
+        logging.error(f"A voice recognition error: {e}") 
         return None
 
 def identify_speaker(new_embeddings, candidate_dict, threshold=0.65):
@@ -38,21 +37,19 @@ def identify_speaker(new_embeddings, candidate_dict, threshold=0.65):
                 best_score = similarity
                 best_stud_id = sid
 
-
     if best_score >= threshold:
         return best_stud_id, best_score
     return None, best_score
 
 
 def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.65):
-
-
     try:
         encoder = load_voice_encoder()
 
         audio, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000)
 
-        segments = librosa.effects.split(audio, top_db=30) # top_db is sensitivity too low can catch whispering too high can make it only capture those sounds where a person is shouting
+        # top_db is sensitivity: too low can catch whispering, too high captures only shouting
+        segments = librosa.effects.split(audio, top_db=30) 
         identify_result = {}
 
         for start, end in segments:
@@ -72,5 +69,6 @@ def process_bulk_audio(audio_bytes, candidate_dict, threshold=0.65):
         return identify_result
     
     except Exception as e:
-        st.error(f"Bulk process error {e}")
-        return None 
+        # Replaced st.error with logging
+        logging.error(f"Bulk process error: {e}") 
+        return None
