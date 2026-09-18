@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: 'https://scanclass-smart-ai-attendance.onrender.com',
+  baseURL: 'https://scanclass-smart-ai-attendance.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
